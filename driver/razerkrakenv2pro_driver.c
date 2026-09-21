@@ -184,6 +184,41 @@ static ssize_t razer_kraken_v2pro_zone_brightness(struct device *dev, u8 mask,
 }
 
 /**
+ * Apply the breathing effect to one or more zones
+ *
+ * The daemon writes 1 byte for a random colour, 3 for one colour and 6 for
+ * two. Nine bytes are refused: the device rejects three colours outright and
+ * keeps whatever it was already showing.
+ */
+static ssize_t razer_kraken_v2pro_zone_breath(struct device *dev, u8 mask,
+        const char *buf, size_t count)
+{
+    u8 colour_count;
+
+    switch(count) {
+    case 3: // Single colour mode
+        colour_count = 1;
+        break;
+
+    case 6: // Dual colour mode
+        colour_count = 2;
+        break;
+
+    case 1: // "Random" colour mode
+        colour_count = 0;
+        break;
+
+    default:
+        dev_warn(dev, "razerkrakenv2pro: breathing mode accepts 1, 3 or 6 bytes\n");
+        return -EINVAL;
+    }
+
+    return razer_kraken_v2pro_zone_effect(dev, mask, KRAKEN_V2_PRO_EFFECT_BREATHING,
+                                          colour_count, colour_count ? buf : NULL,
+                                          count);
+}
+
+/**
  * Write device file "matrix_brightness"
  */
 static ssize_t razer_attr_write_matrix_brightness(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
@@ -235,6 +270,14 @@ static ssize_t razer_attr_write_matrix_effect_static(struct device *dev, struct 
 }
 
 /**
+ * Write device file "matrix_effect_breath"
+ */
+static ssize_t razer_attr_write_matrix_effect_breath(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    return razer_kraken_v2pro_zone_breath(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL, buf, count);
+}
+
+/**
  * Write device file "matrix_effect_spectrum"
  */
 static ssize_t razer_attr_write_matrix_effect_spectrum(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
@@ -260,6 +303,7 @@ static DEVICE_ATTR(device_mode,       0440, razer_attr_read_device_mode,      NU
 static DEVICE_ATTR(matrix_brightness,      0660, razer_attr_read_matrix_brightness, razer_attr_write_matrix_brightness);
 static DEVICE_ATTR(matrix_effect_none,     0220, NULL, razer_attr_write_matrix_effect_none);
 static DEVICE_ATTR(matrix_effect_static,   0220, NULL, razer_attr_write_matrix_effect_static);
+static DEVICE_ATTR(matrix_effect_breath,   0220, NULL, razer_attr_write_matrix_effect_breath);
 static DEVICE_ATTR(matrix_effect_spectrum, 0220, NULL, razer_attr_write_matrix_effect_spectrum);
 
 static void razer_kraken_v2pro_init(struct razer_kraken_v2pro_device *dev, struct hid_device *hdev)
@@ -317,6 +361,7 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_brightness);                     // Brightness
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_none);                    // No effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_static);                  // Static effect
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_breath);                  // Breathing effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
     }
 
@@ -354,6 +399,7 @@ static void razer_kraken_v2pro_disconnect(struct hid_device *hdev)
         device_remove_file(&hdev->dev, &dev_attr_matrix_brightness);                     // Brightness
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_none);                    // No effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_static);                  // Static effect
+        device_remove_file(&hdev->dev, &dev_attr_matrix_effect_breath);                  // Breathing effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
     }
 
