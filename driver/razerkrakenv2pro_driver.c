@@ -27,9 +27,9 @@ MODULE_LICENSE(DRIVER_LICENSE);
 /**
  * Get a report with the header filled in and everything else zeroed
  */
-static struct razer_kraken_v2pro_report get_kraken_v2pro_report(unsigned char command, unsigned char subcommand)
+static struct razer_krakenv2pro_report get_kraken_v2pro_report(unsigned char command, unsigned char subcommand)
 {
-    struct razer_kraken_v2pro_report report = {0};
+    struct razer_krakenv2pro_report report = {0};
 
     report.report_id = KRAKEN_V2_PRO_REPORT_ID;
     report.command = command;
@@ -38,7 +38,7 @@ static struct razer_kraken_v2pro_report get_kraken_v2pro_report(unsigned char co
     return report;
 }
 
-static int razer_kraken_v2pro_send(struct hid_device *hdev, struct razer_kraken_v2pro_report *report)
+static int razer_krakenv2pro_send(struct hid_device *hdev, struct razer_krakenv2pro_report *report)
 {
     struct usb_device *usb_dev = hid_to_usb_dev(hdev);
     int ret;
@@ -73,7 +73,20 @@ static ssize_t razer_attr_read_version(struct device *dev, struct device_attribu
  */
 static ssize_t razer_attr_read_device_type(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    return sysfs_emit(buf, "Razer Kraken Kitty V2 Pro\n");
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
+
+    char *device_type;
+
+    switch (device->usb_pid) {
+    case USB_DEVICE_ID_RAZER_KRAKEN_KITTY_V2_PRO:
+        device_type = "Razer Kraken Kitty V2 Pro";
+        break;
+
+    default:
+        device_type = "Unknown Device";
+    }
+
+    return sysfs_emit(buf, "%s\n", device_type);
 }
 
 /**
@@ -84,7 +97,7 @@ static ssize_t razer_attr_read_device_type(struct device *dev, struct device_att
  */
 static ssize_t razer_attr_read_device_serial(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
 
     return sysfs_emit(buf, "%s\n", device->serial);
 }
@@ -96,7 +109,7 @@ static ssize_t razer_attr_read_device_serial(struct device *dev, struct device_a
  */
 static ssize_t razer_attr_read_firmware_version(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
     unsigned short bcd = le16_to_cpu(hid_to_usb_dev(device->hdev)->descriptor.bcdDevice);
 
     return sysfs_emit(buf, "v%x.%x\n", bcd >> 8, bcd & 0xff);
@@ -119,10 +132,10 @@ static ssize_t razer_attr_read_device_mode(struct device *dev, struct device_att
  * The device rejects a count of 3 outright, leaving its previous state in
  * place, so callers must refuse anything larger.
  */
-static int razer_kraken_v2pro_send_effect(struct razer_kraken_v2pro_device *device,
+static int razer_krakenv2pro_send_effect(struct razer_krakenv2pro_device *device,
         u8 mask, u8 effect, u8 colour_count, const u8 *colours)
 {
-    struct razer_kraken_v2pro_report report =
+    struct razer_krakenv2pro_report report =
         get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_MODE, KRAKEN_V2_PRO_SUB_EFFECT);
 
     report.data[0] = mask;
@@ -132,7 +145,7 @@ static int razer_kraken_v2pro_send_effect(struct razer_kraken_v2pro_device *devi
     if(colour_count)
         memcpy(&report.data[3], colours, colour_count * 3);
 
-    return razer_kraken_v2pro_send(device->hdev, &report);
+    return razer_krakenv2pro_send(device->hdev, &report);
 }
 
 /**
@@ -141,13 +154,13 @@ static int razer_kraken_v2pro_send_effect(struct razer_kraken_v2pro_device *devi
  * device->effect tracks the whole-device effect only, so a write aimed at a
  * single zone leaves it alone.
  */
-static ssize_t razer_kraken_v2pro_zone_effect(struct device *dev, u8 mask,
+static ssize_t razer_krakenv2pro_zone_effect(struct device *dev, u8 mask,
         u8 effect, u8 colour_count, const u8 *colours, size_t count)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
 
     mutex_lock(&device->lock);
-    razer_kraken_v2pro_send_effect(device, mask, effect, colour_count, colours);
+    razer_krakenv2pro_send_effect(device, mask, effect, colour_count, colours);
     if(mask == KRAKEN_V2_PRO_ZONE_MASK_ALL) {
         device->effect = (effect == KRAKEN_V2_PRO_EFFECT_STATIC && colour_count == 0)
                          ? KRAKEN_V2_PRO_EFFECT_NONE : effect;
@@ -158,11 +171,11 @@ static ssize_t razer_kraken_v2pro_zone_effect(struct device *dev, u8 mask,
     return count;
 }
 
-static ssize_t razer_kraken_v2pro_zone_brightness(struct device *dev, u8 mask,
+static ssize_t razer_krakenv2pro_zone_brightness(struct device *dev, u8 mask,
         const char *buf, size_t count)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
-    struct razer_kraken_v2pro_report report =
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_report report =
         get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_BRIGHTNESS, KRAKEN_V2_PRO_SUB_BRIGHTNESS);
     unsigned char brightness;
     int ret;
@@ -177,7 +190,7 @@ static ssize_t razer_kraken_v2pro_zone_brightness(struct device *dev, u8 mask,
     mutex_lock(&device->lock);
     if(mask == KRAKEN_V2_PRO_ZONE_MASK_ALL)
         device->brightness = brightness;
-    razer_kraken_v2pro_send(device->hdev, &report);
+    razer_krakenv2pro_send(device->hdev, &report);
     mutex_unlock(&device->lock);
 
     return count;
@@ -190,7 +203,7 @@ static ssize_t razer_kraken_v2pro_zone_brightness(struct device *dev, u8 mask,
  * two. Nine bytes are refused: the device rejects three colours outright and
  * keeps whatever it was already showing.
  */
-static ssize_t razer_kraken_v2pro_zone_breath(struct device *dev, u8 mask,
+static ssize_t razer_krakenv2pro_zone_breath(struct device *dev, u8 mask,
         const char *buf, size_t count)
 {
     u8 colour_count;
@@ -213,7 +226,7 @@ static ssize_t razer_kraken_v2pro_zone_breath(struct device *dev, u8 mask,
         return -EINVAL;
     }
 
-    return razer_kraken_v2pro_zone_effect(dev, mask, KRAKEN_V2_PRO_EFFECT_BREATHING,
+    return razer_krakenv2pro_zone_effect(dev, mask, KRAKEN_V2_PRO_EFFECT_BREATHING,
                                           colour_count, colour_count ? buf : NULL,
                                           count);
 }
@@ -223,16 +236,16 @@ static ssize_t razer_kraken_v2pro_zone_breath(struct device *dev, u8 mask,
  *
  * Caller holds device->lock.
  */
-static int razer_kraken_v2pro_enter_direct(struct razer_kraken_v2pro_device *device)
+static int razer_krakenv2pro_enter_direct(struct razer_krakenv2pro_device *device)
 {
-    struct razer_kraken_v2pro_report report =
+    struct razer_krakenv2pro_report report =
         get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_MODE, KRAKEN_V2_PRO_SUB_MODE);
     int ret;
 
     report.data[0] = KRAKEN_V2_PRO_ZONE_MASK_ALL;
     report.data[1] = KRAKEN_V2_PRO_MODE_DIRECT;
 
-    ret = razer_kraken_v2pro_send(device->hdev, &report);
+    ret = razer_krakenv2pro_send(device->hdev, &report);
     if(!ret) {
         device->effect = KRAKEN_V2_PRO_MODE_DIRECT;
         device->direct = true;
@@ -246,10 +259,10 @@ static int razer_kraken_v2pro_enter_direct(struct razer_kraken_v2pro_device *dev
  */
 static ssize_t razer_attr_write_matrix_effect_custom(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
 
     mutex_lock(&device->lock);
-    razer_kraken_v2pro_enter_direct(device);
+    razer_krakenv2pro_enter_direct(device);
     mutex_unlock(&device->lock);
 
     return count;
@@ -263,8 +276,8 @@ static ssize_t razer_attr_write_matrix_effect_custom(struct device *dev, struct 
  */
 static ssize_t razer_attr_write_matrix_custom_frame(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
-    struct razer_kraken_v2pro_report report =
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_report report =
         get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_FRAME, 0x00);
     unsigned char row, start_col, end_col, num_cols;
 
@@ -295,7 +308,7 @@ static ssize_t razer_attr_write_matrix_custom_frame(struct device *dev, struct d
      * session would be lost. Switch on the transition only, not per frame.
      */
     if(!device->direct)
-        razer_kraken_v2pro_enter_direct(device);
+        razer_krakenv2pro_enter_direct(device);
 
     /*
      * The wire format has no partial frame, so merge into the shadow copy and
@@ -305,7 +318,7 @@ static ssize_t razer_attr_write_matrix_custom_frame(struct device *dev, struct d
     memcpy(&device->frame[start_col * 3], &buf[3], num_cols * 3);
     memcpy(report.data, device->frame, KRAKEN_V2_PRO_FRAME_LEN);
 
-    razer_kraken_v2pro_send(device->hdev, &report);
+    razer_krakenv2pro_send(device->hdev, &report);
     mutex_unlock(&device->lock);
 
     return count;
@@ -316,7 +329,7 @@ static ssize_t razer_attr_write_matrix_custom_frame(struct device *dev, struct d
  */
 static ssize_t razer_attr_write_matrix_brightness(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    return razer_kraken_v2pro_zone_brightness(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL, buf, count);
+    return razer_krakenv2pro_zone_brightness(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL, buf, count);
 }
 
 /**
@@ -326,7 +339,7 @@ static ssize_t razer_attr_write_matrix_brightness(struct device *dev, struct dev
  */
 static ssize_t razer_attr_read_matrix_brightness(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
     unsigned char brightness;
 
     mutex_lock(&device->lock);
@@ -345,7 +358,7 @@ static ssize_t razer_attr_read_matrix_brightness(struct device *dev, struct devi
  */
 static ssize_t razer_attr_read_matrix_current_effect(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
     unsigned char effect;
 
     mutex_lock(&device->lock);
@@ -363,7 +376,7 @@ static ssize_t razer_attr_read_matrix_current_effect(struct device *dev, struct 
  */
 static ssize_t razer_attr_write_matrix_effect_none(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    return razer_kraken_v2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
+    return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
                                           KRAKEN_V2_PRO_EFFECT_STATIC, 0, NULL, count);
 }
 
@@ -377,7 +390,7 @@ static ssize_t razer_attr_write_matrix_effect_static(struct device *dev, struct 
         return -EINVAL;
     }
 
-    return razer_kraken_v2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
+    return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
                                           KRAKEN_V2_PRO_EFFECT_STATIC, 1, buf, count);
 }
 
@@ -386,7 +399,7 @@ static ssize_t razer_attr_write_matrix_effect_static(struct device *dev, struct 
  */
 static ssize_t razer_attr_write_matrix_effect_breath(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    return razer_kraken_v2pro_zone_breath(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL, buf, count);
+    return razer_krakenv2pro_zone_breath(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL, buf, count);
 }
 
 /**
@@ -394,7 +407,7 @@ static ssize_t razer_attr_write_matrix_effect_breath(struct device *dev, struct 
  */
 static ssize_t razer_attr_write_matrix_effect_spectrum(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-    return razer_kraken_v2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
+    return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
                                           KRAKEN_V2_PRO_EFFECT_SPECTRUM, 0, NULL, count);
 }
 
@@ -433,7 +446,7 @@ static DEVICE_ATTR(matrix_custom_frame,    0220, NULL, razer_attr_write_matrix_c
 static ssize_t razer_attr_write_##zone##_matrix_effect_none(struct device *dev,                     \
         struct device_attribute *attr, const char *buf, size_t count)                               \
 {                                                                                                   \
-    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+    return razer_krakenv2pro_zone_effect(dev, mask,                                                \
             KRAKEN_V2_PRO_EFFECT_STATIC, 0, NULL, count);                                           \
 }                                                                                                   \
 static ssize_t razer_attr_write_##zone##_matrix_effect_static(struct device *dev,                   \
@@ -443,24 +456,24 @@ static ssize_t razer_attr_write_##zone##_matrix_effect_static(struct device *dev
         dev_warn(dev, "razerkrakenv2pro: static mode only accepts RGB (3byte)\n");                  \
         return -EINVAL;                                                                             \
     }                                                                                               \
-    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+    return razer_krakenv2pro_zone_effect(dev, mask,                                                \
             KRAKEN_V2_PRO_EFFECT_STATIC, 1, buf, count);                                            \
 }                                                                                                   \
 static ssize_t razer_attr_write_##zone##_matrix_effect_spectrum(struct device *dev,                 \
         struct device_attribute *attr, const char *buf, size_t count)                               \
 {                                                                                                   \
-    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+    return razer_krakenv2pro_zone_effect(dev, mask,                                                \
             KRAKEN_V2_PRO_EFFECT_SPECTRUM, 0, NULL, count);                                         \
 }                                                                                                   \
 static ssize_t razer_attr_write_##zone##_matrix_effect_breath(struct device *dev,                   \
         struct device_attribute *attr, const char *buf, size_t count)                               \
 {                                                                                                   \
-    return razer_kraken_v2pro_zone_breath(dev, mask, buf, count);                                   \
+    return razer_krakenv2pro_zone_breath(dev, mask, buf, count);                                   \
 }                                                                                                   \
 static ssize_t razer_attr_write_##zone##_led_brightness(struct device *dev,                         \
         struct device_attribute *attr, const char *buf, size_t count)                               \
 {                                                                                                   \
-    return razer_kraken_v2pro_zone_brightness(dev, mask, buf, count);                               \
+    return razer_krakenv2pro_zone_brightness(dev, mask, buf, count);                               \
 }                                                                                                   \
 static DEVICE_ATTR(zone##_matrix_effect_none,     0220, NULL, razer_attr_write_##zone##_matrix_effect_none);     \
 static DEVICE_ATTR(zone##_matrix_effect_static,   0220, NULL, razer_attr_write_##zone##_matrix_effect_static);   \
@@ -478,7 +491,7 @@ KRAKEN_V2_PRO_ZONE_ATTRS(right_ear, KRAKEN_V2_PRO_ZONE_RIGHT_EAR);
 KRAKEN_V2_PRO_ZONE_ATTRS(left,      KRAKEN_V2_PRO_ZONE_LEFT_CUP);
 KRAKEN_V2_PRO_ZONE_ATTRS(right,     KRAKEN_V2_PRO_ZONE_RIGHT_CUP);
 
-static void razer_kraken_v2pro_init(struct razer_kraken_v2pro_device *dev, struct hid_device *hdev)
+static void razer_krakenv2pro_init(struct razer_krakenv2pro_device *dev, struct hid_device *hdev)
 {
     struct usb_device *usb_dev = hid_to_usb_dev(hdev);
     unsigned int rand_serial = 0;
@@ -509,11 +522,11 @@ static void razer_kraken_v2pro_init(struct razer_kraken_v2pro_device *dev, struc
     dev->direct = false;
 }
 
-static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_device_id *id)
+static int razer_krakenv2pro_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
     int retval = 0;
     struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
-    struct razer_kraken_v2pro_device *dev = NULL;
+    struct razer_krakenv2pro_device *dev = NULL;
 
     dev = kzalloc_obj(*dev);
     if(dev == NULL) {
@@ -521,7 +534,7 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         return -ENOMEM;
     }
 
-    razer_kraken_v2pro_init(dev, hdev);
+    razer_krakenv2pro_init(dev, hdev);
 
     if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_NONE) {
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_version);                               // Get driver version
@@ -537,35 +550,39 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
+        switch(dev->usb_pid) {
+        case USB_DEVICE_ID_RAZER_KRAKEN_KITTY_V2_PRO:
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
 
-        // left cat ear
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_none);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_static);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_spectrum);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_breath);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_led_brightness);
+            // left cat ear
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_none);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_static);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_spectrum);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_breath);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_led_brightness);
 
-        // right cat ear
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_none);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_static);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_spectrum);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_breath);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_led_brightness);
+            // right cat ear
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_none);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_static);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_spectrum);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_breath);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_led_brightness);
 
-        // left ear cup
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_none);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_static);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_spectrum);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_breath);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_led_brightness);
+            // left ear cup
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_none);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_static);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_spectrum);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_breath);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_led_brightness);
 
-        // right ear cup
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_none);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_static);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_spectrum);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_breath);
-        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_led_brightness);
+            // right ear cup
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_none);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_static);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_spectrum);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_breath);
+            CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_led_brightness);
+            break;
+        }
     }
 
     dev_set_drvdata(&hdev->dev, dev);
@@ -587,9 +604,9 @@ exit_free:
     return retval;
 }
 
-static void razer_kraken_v2pro_disconnect(struct hid_device *hdev)
+static void razer_krakenv2pro_disconnect(struct hid_device *hdev)
 {
-    struct razer_kraken_v2pro_device *dev = dev_get_drvdata(&hdev->dev);
+    struct razer_krakenv2pro_device *dev = dev_get_drvdata(&hdev->dev);
     struct usb_interface *intf = to_usb_interface(hdev->dev.parent);
 
     if(intf->cur_altsetting->desc.bInterfaceProtocol == USB_INTERFACE_PROTOCOL_NONE) {
@@ -649,11 +666,11 @@ static const struct hid_device_id razer_devices[] = {
 
 MODULE_DEVICE_TABLE(hid, razer_devices);
 
-static struct hid_driver razer_kraken_v2pro_driver = {
+static struct hid_driver razer_krakenv2pro_driver = {
     .name = "razerkrakenv2pro",
     .id_table = razer_devices,
-    .probe = razer_kraken_v2pro_probe,
-    .remove = razer_kraken_v2pro_disconnect,
+    .probe = razer_krakenv2pro_probe,
+    .remove = razer_krakenv2pro_disconnect,
 };
 
-module_hid_driver(razer_kraken_v2pro_driver);
+module_hid_driver(razer_krakenv2pro_driver);

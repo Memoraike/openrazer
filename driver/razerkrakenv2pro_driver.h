@@ -77,7 +77,7 @@
 #define KRAKEN_V2_PRO_ZONE_RIGHT_CUP 0x08
 #define KRAKEN_V2_PRO_ZONE_MASK_ALL 0x0f
 
-struct razer_kraken_v2pro_device {
+struct razer_krakenv2pro_device {
     struct hid_device *hdev;
     struct mutex lock;
     unsigned short usb_pid;
@@ -102,7 +102,7 @@ struct razer_kraken_v2pro_device {
  *   40 02 01 0f XX 00 ...                brightness XX
  *   40 03 00 R G B R G B R G B R G B     one colour per zone
  */
-struct razer_kraken_v2pro_report {
+struct razer_krakenv2pro_report {
     unsigned char report_id;
     unsigned char command;
     unsigned char subcommand;
