@@ -219,6 +219,99 @@ static ssize_t razer_kraken_v2pro_zone_breath(struct device *dev, u8 mask,
 }
 
 /**
+ * Switch the device into direct mode, where it takes colour frames
+ *
+ * Caller holds device->lock.
+ */
+static int razer_kraken_v2pro_enter_direct(struct razer_kraken_v2pro_device *device)
+{
+    struct razer_kraken_v2pro_report report =
+        get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_MODE, KRAKEN_V2_PRO_SUB_MODE);
+    int ret;
+
+    report.data[0] = KRAKEN_V2_PRO_ZONE_MASK_ALL;
+    report.data[1] = KRAKEN_V2_PRO_MODE_DIRECT;
+
+    ret = razer_kraken_v2pro_send(device->hdev, &report);
+    if(!ret) {
+        device->effect = KRAKEN_V2_PRO_MODE_DIRECT;
+        device->direct = true;
+    }
+
+    return ret;
+}
+
+/**
+ * Write device file "matrix_effect_custom"
+ */
+static ssize_t razer_attr_write_matrix_effect_custom(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+
+    mutex_lock(&device->lock);
+    razer_kraken_v2pro_enter_direct(device);
+    mutex_unlock(&device->lock);
+
+    return count;
+}
+
+/**
+ * Write device file "matrix_custom_frame"
+ *
+ * Takes row, start column, end column and then RGB per column, as everywhere
+ * else in openrazer. The device is a single row of four zones.
+ */
+static ssize_t razer_attr_write_matrix_custom_frame(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    struct razer_kraken_v2pro_report report =
+        get_kraken_v2pro_report(KRAKEN_V2_PRO_CMD_FRAME, 0x00);
+    unsigned char row, start_col, end_col, num_cols;
+
+    if(count < 4)
+        return -EINVAL;
+
+    row = buf[0];
+    start_col = buf[1];
+    end_col = buf[2];
+
+    // The device has a single row
+    if(row != 0)
+        return -EINVAL;
+
+    if(start_col > end_col || end_col >= KRAKEN_V2_PRO_ZONES)
+        return -EINVAL;
+
+    num_cols = end_col - start_col + 1;
+
+    if(count != (size_t)(3 + num_cols * 3))
+        return -EINVAL;
+
+    mutex_lock(&device->lock);
+
+    /*
+     * The device discards frames unless direct mode is in force, and pylib
+     * writes the frame before matrix_effect_custom, so the first frame of a
+     * session would be lost. Switch on the transition only, not per frame.
+     */
+    if(!device->direct)
+        razer_kraken_v2pro_enter_direct(device);
+
+    /*
+     * The wire format has no partial frame, so merge into the shadow copy and
+     * send all four zones. Without this a write naming only some columns
+     * would blank the rest.
+     */
+    memcpy(&device->frame[start_col * 3], &buf[3], num_cols * 3);
+    memcpy(report.data, device->frame, KRAKEN_V2_PRO_FRAME_LEN);
+
+    razer_kraken_v2pro_send(device->hdev, &report);
+    mutex_unlock(&device->lock);
+
+    return count;
+}
+
+/**
  * Write device file "matrix_brightness"
  */
 static ssize_t razer_attr_write_matrix_brightness(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
@@ -305,6 +398,8 @@ static DEVICE_ATTR(matrix_effect_none,     0220, NULL, razer_attr_write_matrix_e
 static DEVICE_ATTR(matrix_effect_static,   0220, NULL, razer_attr_write_matrix_effect_static);
 static DEVICE_ATTR(matrix_effect_breath,   0220, NULL, razer_attr_write_matrix_effect_breath);
 static DEVICE_ATTR(matrix_effect_spectrum, 0220, NULL, razer_attr_write_matrix_effect_spectrum);
+static DEVICE_ATTR(matrix_effect_custom,   0220, NULL, razer_attr_write_matrix_effect_custom);
+static DEVICE_ATTR(matrix_custom_frame,    0220, NULL, razer_attr_write_matrix_custom_frame);
 
 static void razer_kraken_v2pro_init(struct razer_kraken_v2pro_device *dev, struct hid_device *hdev)
 {
@@ -363,6 +458,8 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_static);                  // Static effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_breath);                  // Breathing effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
     }
 
     dev_set_drvdata(&hdev->dev, dev);
@@ -401,6 +498,8 @@ static void razer_kraken_v2pro_disconnect(struct hid_device *hdev)
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_static);                  // Static effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_breath);                  // Breathing effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
+        device_remove_file(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
+        device_remove_file(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
     }
 
     hid_hw_stop(hdev);
