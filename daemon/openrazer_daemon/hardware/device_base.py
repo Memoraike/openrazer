@@ -44,7 +44,7 @@ class RazerDevice(DBusService):
 
     WAVE_DIRS = (1, 2)
 
-    ZONES = ('backlight', 'logo', 'scroll', 'left', 'right', 'charging', 'fast_charging', 'fully_charged', 'channel1', 'channel2', 'channel3', 'channel4', 'channel5', 'channel6')
+    ZONES = ('backlight', 'logo', 'scroll', 'left', 'right', 'left_ear', 'right_ear', 'charging', 'fast_charging', 'fully_charged', 'channel1', 'channel2', 'channel3', 'channel4', 'channel5', 'channel6')
 
     DEVICE_IMAGE: Optional[str] = None
 
@@ -196,6 +196,20 @@ class RazerDevice(DBusService):
                 ('razer.device.lighting.left', 'getLeftEffectColors', self.get_current_left_effect_colors, None, 'ay'),
                 ('razer.device.lighting.left', 'getLeftEffectSpeed', self.get_current_left_effect_speed, None, 'i'),
                 ('razer.device.lighting.left', 'getLeftWaveDir', self.get_current_left_wave_dir, None, 'i'),
+            },
+
+            "left_ear": {
+                ('razer.device.lighting.left_ear', 'getLeftEarEffect', self.get_current_left_ear_effect, None, 's'),
+                ('razer.device.lighting.left_ear', 'getLeftEarEffectColors', self.get_current_left_ear_effect_colors, None, 'ay'),
+                ('razer.device.lighting.left_ear', 'getLeftEarEffectSpeed', self.get_current_left_ear_effect_speed, None, 'i'),
+                ('razer.device.lighting.left_ear', 'getLeftEarWaveDir', self.get_current_left_ear_wave_dir, None, 'i'),
+            },
+
+            "right_ear": {
+                ('razer.device.lighting.right_ear', 'getRightEarEffect', self.get_current_right_ear_effect, None, 's'),
+                ('razer.device.lighting.right_ear', 'getRightEarEffectColors', self.get_current_right_ear_effect_colors, None, 'ay'),
+                ('razer.device.lighting.right_ear', 'getRightEarEffectSpeed', self.get_current_right_ear_effect_speed, None, 'i'),
+                ('razer.device.lighting.right_ear', 'getRightEarWaveDir', self.get_current_right_ear_wave_dir, None, 'i'),
             },
 
             "right": {
@@ -722,6 +736,94 @@ class RazerDevice(DBusService):
         self.logger.debug("DBus call get_current_left_wave_dir")
 
         return self.zone["left"]["wave_dir"]
+
+    def get_current_left_ear_effect(self):
+        """
+        Get the device's current left ear effect
+
+        :return: Effect
+        :rtype: string
+        """
+        self.logger.debug("DBus call get_current_left_ear_effect")
+
+        return self.zone["left_ear"]["effect"]
+
+    def get_current_left_ear_effect_colors(self):
+        """
+        Get the device's current left ear effect's colors
+
+        :return: 3 colors
+        :rtype: list of byte
+        """
+        self.logger.debug("DBus call get_current_left_ear_effect_colors")
+
+        return self.zone["left_ear"]["colors"]
+
+    def get_current_left_ear_effect_speed(self):
+        """
+        Get the device's current left ear effect's speed
+
+        :return: Speed
+        :rtype: int
+        """
+        self.logger.debug("DBus call get_current_left_ear_effect_speed")
+
+        return self.zone["left_ear"]["speed"]
+
+    def get_current_left_ear_wave_dir(self):
+        """
+        Get the device's current left ear wave direction
+
+        :return: Direction
+        :rtype: int
+        """
+        self.logger.debug("DBus call get_current_left_ear_wave_dir")
+
+        return self.zone["left_ear"]["wave_dir"]
+
+    def get_current_right_ear_effect(self):
+        """
+        Get the device's current right ear effect
+
+        :return: Effect
+        :rtype: string
+        """
+        self.logger.debug("DBus call get_current_right_ear_effect")
+
+        return self.zone["right_ear"]["effect"]
+
+    def get_current_right_ear_effect_colors(self):
+        """
+        Get the device's current right ear effect's colors
+
+        :return: 3 colors
+        :rtype: list of byte
+        """
+        self.logger.debug("DBus call get_current_right_ear_effect_colors")
+
+        return self.zone["right_ear"]["colors"]
+
+    def get_current_right_ear_effect_speed(self):
+        """
+        Get the device's current right ear effect's speed
+
+        :return: Speed
+        :rtype: int
+        """
+        self.logger.debug("DBus call get_current_right_ear_effect_speed")
+
+        return self.zone["right_ear"]["speed"]
+
+    def get_current_right_ear_wave_dir(self):
+        """
+        Get the device's current right ear wave direction
+
+        :return: Direction
+        :rtype: int
+        """
+        self.logger.debug("DBus call get_current_right_ear_wave_dir")
+
+        return self.zone["right_ear"]["wave_dir"]
 
     def get_current_right_effect(self):
         """
