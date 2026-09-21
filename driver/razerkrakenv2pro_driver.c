@@ -421,6 +421,63 @@ static DEVICE_ATTR(matrix_effect_spectrum, 0220, NULL, razer_attr_write_matrix_e
 static DEVICE_ATTR(matrix_effect_custom,   0220, NULL, razer_attr_write_matrix_effect_custom);
 static DEVICE_ATTR(matrix_custom_frame,    0220, NULL, razer_attr_write_matrix_custom_frame);
 
+/*
+ * Each zone takes effects and brightness on its own, through the zone mask.
+ * Writing the twenty attributes out by hand would be several hundred lines of
+ * copy-paste, so they are generated from the mask-aware helpers above.
+ *
+ * Brightness is write-only per zone: only the whole-device value is cached,
+ * and the device cannot be asked, so a per-zone read would be a guess.
+ */
+#define KRAKEN_V2_PRO_ZONE_ATTRS(zone, mask)                                                        \
+static ssize_t razer_attr_write_##zone##_matrix_effect_none(struct device *dev,                     \
+        struct device_attribute *attr, const char *buf, size_t count)                               \
+{                                                                                                   \
+    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+            KRAKEN_V2_PRO_EFFECT_STATIC, 0, NULL, count);                                           \
+}                                                                                                   \
+static ssize_t razer_attr_write_##zone##_matrix_effect_static(struct device *dev,                   \
+        struct device_attribute *attr, const char *buf, size_t count)                               \
+{                                                                                                   \
+    if(count != 3) {                                                                                \
+        dev_warn(dev, "razerkrakenv2pro: static mode only accepts RGB (3byte)\n");                  \
+        return -EINVAL;                                                                             \
+    }                                                                                               \
+    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+            KRAKEN_V2_PRO_EFFECT_STATIC, 1, buf, count);                                            \
+}                                                                                                   \
+static ssize_t razer_attr_write_##zone##_matrix_effect_spectrum(struct device *dev,                 \
+        struct device_attribute *attr, const char *buf, size_t count)                               \
+{                                                                                                   \
+    return razer_kraken_v2pro_zone_effect(dev, mask,                                                \
+            KRAKEN_V2_PRO_EFFECT_SPECTRUM, 0, NULL, count);                                         \
+}                                                                                                   \
+static ssize_t razer_attr_write_##zone##_matrix_effect_breath(struct device *dev,                   \
+        struct device_attribute *attr, const char *buf, size_t count)                               \
+{                                                                                                   \
+    return razer_kraken_v2pro_zone_breath(dev, mask, buf, count);                                   \
+}                                                                                                   \
+static ssize_t razer_attr_write_##zone##_led_brightness(struct device *dev,                         \
+        struct device_attribute *attr, const char *buf, size_t count)                               \
+{                                                                                                   \
+    return razer_kraken_v2pro_zone_brightness(dev, mask, buf, count);                               \
+}                                                                                                   \
+static DEVICE_ATTR(zone##_matrix_effect_none,     0220, NULL, razer_attr_write_##zone##_matrix_effect_none);     \
+static DEVICE_ATTR(zone##_matrix_effect_static,   0220, NULL, razer_attr_write_##zone##_matrix_effect_static);   \
+static DEVICE_ATTR(zone##_matrix_effect_spectrum, 0220, NULL, razer_attr_write_##zone##_matrix_effect_spectrum); \
+static DEVICE_ATTR(zone##_matrix_effect_breath,   0220, NULL, razer_attr_write_##zone##_matrix_effect_breath);   \
+static DEVICE_ATTR(zone##_led_brightness,         0220, NULL, razer_attr_write_##zone##_led_brightness)
+
+/*
+ * The ear cups use openrazer's existing left/right zones, so the daemon
+ * already has D-Bus methods writing to these exact attribute names. The cat
+ * ears have no equivalent in the zone vocabulary and get their own.
+ */
+KRAKEN_V2_PRO_ZONE_ATTRS(left_ear,  KRAKEN_V2_PRO_ZONE_LEFT_EAR);
+KRAKEN_V2_PRO_ZONE_ATTRS(right_ear, KRAKEN_V2_PRO_ZONE_RIGHT_EAR);
+KRAKEN_V2_PRO_ZONE_ATTRS(left,      KRAKEN_V2_PRO_ZONE_LEFT_CUP);
+KRAKEN_V2_PRO_ZONE_ATTRS(right,     KRAKEN_V2_PRO_ZONE_RIGHT_CUP);
+
 static void razer_kraken_v2pro_init(struct razer_kraken_v2pro_device *dev, struct hid_device *hdev)
 {
     struct usb_device *usb_dev = hid_to_usb_dev(hdev);
@@ -481,6 +538,34 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
+
+        // left cat ear
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_none);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_static);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_spectrum);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_matrix_effect_breath);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_ear_led_brightness);
+
+        // right cat ear
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_none);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_static);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_spectrum);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_matrix_effect_breath);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_ear_led_brightness);
+
+        // left ear cup
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_none);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_static);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_spectrum);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_matrix_effect_breath);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_left_led_brightness);
+
+        // right ear cup
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_none);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_static);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_spectrum);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_matrix_effect_breath);
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_right_led_brightness);
     }
 
     dev_set_drvdata(&hdev->dev, dev);
@@ -522,6 +607,34 @@ static void razer_kraken_v2pro_disconnect(struct hid_device *hdev)
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
         device_remove_file(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
+
+        // left cat ear
+        device_remove_file(&hdev->dev, &dev_attr_left_ear_matrix_effect_none);
+        device_remove_file(&hdev->dev, &dev_attr_left_ear_matrix_effect_static);
+        device_remove_file(&hdev->dev, &dev_attr_left_ear_matrix_effect_spectrum);
+        device_remove_file(&hdev->dev, &dev_attr_left_ear_matrix_effect_breath);
+        device_remove_file(&hdev->dev, &dev_attr_left_ear_led_brightness);
+
+        // right cat ear
+        device_remove_file(&hdev->dev, &dev_attr_right_ear_matrix_effect_none);
+        device_remove_file(&hdev->dev, &dev_attr_right_ear_matrix_effect_static);
+        device_remove_file(&hdev->dev, &dev_attr_right_ear_matrix_effect_spectrum);
+        device_remove_file(&hdev->dev, &dev_attr_right_ear_matrix_effect_breath);
+        device_remove_file(&hdev->dev, &dev_attr_right_ear_led_brightness);
+
+        // left ear cup
+        device_remove_file(&hdev->dev, &dev_attr_left_matrix_effect_none);
+        device_remove_file(&hdev->dev, &dev_attr_left_matrix_effect_static);
+        device_remove_file(&hdev->dev, &dev_attr_left_matrix_effect_spectrum);
+        device_remove_file(&hdev->dev, &dev_attr_left_matrix_effect_breath);
+        device_remove_file(&hdev->dev, &dev_attr_left_led_brightness);
+
+        // right ear cup
+        device_remove_file(&hdev->dev, &dev_attr_right_matrix_effect_none);
+        device_remove_file(&hdev->dev, &dev_attr_right_matrix_effect_static);
+        device_remove_file(&hdev->dev, &dev_attr_right_matrix_effect_spectrum);
+        device_remove_file(&hdev->dev, &dev_attr_right_matrix_effect_breath);
+        device_remove_file(&hdev->dev, &dev_attr_right_led_brightness);
     }
 
     hid_hw_stop(hdev);
