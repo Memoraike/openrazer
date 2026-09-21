@@ -227,8 +227,8 @@ static ssize_t razer_krakenv2pro_zone_breath(struct device *dev, u8 mask,
     }
 
     return razer_krakenv2pro_zone_effect(dev, mask, KRAKEN_V2_PRO_EFFECT_BREATHING,
-                                          colour_count, colour_count ? buf : NULL,
-                                          count);
+                                         colour_count, colour_count ? buf : NULL,
+                                         count);
 }
 
 /**
@@ -383,7 +383,7 @@ static ssize_t razer_attr_read_matrix_current_effect(struct device *dev, struct 
 static ssize_t razer_attr_write_matrix_effect_none(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
-                                          KRAKEN_V2_PRO_EFFECT_STATIC, 0, NULL, count);
+                                         KRAKEN_V2_PRO_EFFECT_STATIC, 0, NULL, count);
 }
 
 /**
@@ -397,7 +397,7 @@ static ssize_t razer_attr_write_matrix_effect_static(struct device *dev, struct 
     }
 
     return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
-                                          KRAKEN_V2_PRO_EFFECT_STATIC, 1, buf, count);
+                                         KRAKEN_V2_PRO_EFFECT_STATIC, 1, buf, count);
 }
 
 /**
@@ -414,7 +414,7 @@ static ssize_t razer_attr_write_matrix_effect_breath(struct device *dev, struct 
 static ssize_t razer_attr_write_matrix_effect_spectrum(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     return razer_krakenv2pro_zone_effect(dev, KRAKEN_V2_PRO_ZONE_MASK_ALL,
-                                          KRAKEN_V2_PRO_EFFECT_SPECTRUM, 0, NULL, count);
+                                         KRAKEN_V2_PRO_EFFECT_SPECTRUM, 0, NULL, count);
 }
 
 /*
