@@ -46,6 +46,13 @@ class RazerDevice(DBusService):
 
     ZONES = ('backlight', 'logo', 'scroll', 'left', 'right', 'left_ear', 'right_ear', 'charging', 'fast_charging', 'fully_charged', 'channel1', 'channel2', 'channel3', 'channel4', 'channel5', 'channel6')
 
+    # Zones that the main (backlight) zone physically covers. Normally zones are
+    # separate LEDs and this stays empty, but a device whose main commands drive
+    # the same LEDs as its per-zone commands lists them here, so that setting
+    # the main zone does not leave the per-zone state lying about what the
+    # hardware is doing.
+    MAIN_ZONE_COVERS: tuple = ()
+
     DEVICE_IMAGE: Optional[str] = None
 
     def __init__(self, device_path, device_number, config, persistence, testing, additional_interfaces, additional_methods, unknown_serial_counter):
@@ -558,6 +565,12 @@ class RazerDevice(DBusService):
 
         if zone:
             self.zone[zone][key] = value
+
+            # The main zone's commands drive these zones too, so their state
+            # would otherwise go stale the moment the main zone is set
+            if zone == 'backlight':
+                for covered in self.MAIN_ZONE_COVERS:
+                    self.zone[covered][key] = value
         else:
             self.zone[key] = value
 

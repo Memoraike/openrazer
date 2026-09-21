@@ -276,4 +276,8 @@ class RazerKrakenKittyV2Pro(__RazerDeviceBrightnessSuspend):
     HAS_MATRIX = True
     MATRIX_DIMS = [1, 4]
 
+    # The whole-device commands carry a zone mask covering all four zones, so
+    # they drive exactly the same LEDs the per-zone commands do
+    MAIN_ZONE_COVERS = ('left', 'right', 'left_ear', 'right_ear')
+
     DEVICE_IMAGE = "https://dl.razerzone.com/src2/6313/6313-1-en-v1.png"
