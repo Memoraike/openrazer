@@ -256,13 +256,19 @@ static int razer_krakenv2pro_enter_direct(struct razer_krakenv2pro_device *devic
 
 /**
  * Write device file "matrix_effect_custom"
+ *
+ * Only switches if the device is not in direct mode already. The mode command
+ * discards a frame that arrived just before it, and pylib draws by writing
+ * matrix_custom_frame and then matrix_effect_custom, so sending it every time
+ * would swallow every frame: the colours would only appear one draw late.
  */
 static ssize_t razer_attr_write_matrix_effect_custom(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     struct razer_krakenv2pro_device *device = dev_get_drvdata(dev);
 
     mutex_lock(&device->lock);
-    razer_krakenv2pro_enter_direct(device);
+    if(!device->direct)
+        razer_krakenv2pro_enter_direct(device);
     mutex_unlock(&device->lock);
 
     return count;

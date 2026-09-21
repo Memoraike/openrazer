@@ -29,7 +29,8 @@
  *
  * A colour frame is discarded unless the device is in direct mode, and pylib
  * writes the frame before switching, so matrix_custom_frame switches by
- * itself.
+ * itself. The mode command also discards a frame that arrived immediately
+ * before it, so it is only ever sent when the mode actually has to change.
  */
 #define KRAKEN_V2_PRO_REPORT_ID 0x40
 #define KRAKEN_V2_PRO_REPORT_LEN 15
