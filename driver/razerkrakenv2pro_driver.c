@@ -337,6 +337,25 @@ static ssize_t razer_attr_read_matrix_brightness(struct device *dev, struct devi
 }
 
 /**
+ * Read device file "matrix_current_effect"
+ *
+ * Reports the wire value of the last effect applied to the whole device.
+ * A write aimed at a single zone does not change it, and the device cannot
+ * be asked what it is actually showing.
+ */
+static ssize_t razer_attr_read_matrix_current_effect(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct razer_kraken_v2pro_device *device = dev_get_drvdata(dev);
+    unsigned char effect;
+
+    mutex_lock(&device->lock);
+    effect = device->effect;
+    mutex_unlock(&device->lock);
+
+    return sysfs_emit(buf, "%02x\n", effect);
+}
+
+/**
  * Write device file "matrix_effect_none"
  *
  * Static with no colour switches the LEDs off in hardware, and that survives
@@ -393,6 +412,7 @@ static DEVICE_ATTR(device_serial,     0440, razer_attr_read_device_serial,    NU
 static DEVICE_ATTR(firmware_version,  0440, razer_attr_read_firmware_version, NULL);
 static DEVICE_ATTR(device_mode,       0440, razer_attr_read_device_mode,      NULL);
 
+static DEVICE_ATTR(matrix_current_effect,  0440, razer_attr_read_matrix_current_effect, NULL);
 static DEVICE_ATTR(matrix_brightness,      0660, razer_attr_read_matrix_brightness, razer_attr_write_matrix_brightness);
 static DEVICE_ATTR(matrix_effect_none,     0220, NULL, razer_attr_write_matrix_effect_none);
 static DEVICE_ATTR(matrix_effect_static,   0220, NULL, razer_attr_write_matrix_effect_static);
@@ -460,6 +480,7 @@ static int razer_kraken_v2pro_probe(struct hid_device *hdev, const struct hid_de
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
         CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
+        CREATE_DEVICE_FILE(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
     }
 
     dev_set_drvdata(&hdev->dev, dev);
@@ -500,6 +521,7 @@ static void razer_kraken_v2pro_disconnect(struct hid_device *hdev)
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_spectrum);                // Spectrum effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_effect_custom);                  // Custom effect
         device_remove_file(&hdev->dev, &dev_attr_matrix_custom_frame);                   // Custom frame
+        device_remove_file(&hdev->dev, &dev_attr_matrix_current_effect);                 // Get current effect
     }
 
     hid_hw_stop(hdev);
